@@ -33,6 +33,7 @@
         "*.rh": "c",
         "i2c_master.h": "c",
         "type_traits": "c",
-        "xutility": "c"
+        "xutility": "c",
+        "spider_server.h": "c"
     }
 }
