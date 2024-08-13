@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "i2c_master.h": "c",
+        "i2c_slave.h": "c"
+    },
+    "idf.adapterTargetName": "esp32s2",
+    "idf.openOcdConfigs": [
+        "board/esp32s2-kaluga-1.cfg"
+    ],
+    "idf.portWin": "COM6"
+}

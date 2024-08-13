@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title></title>
+    <meta name="description" content="" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <table>
+      <tbody>
+        <tr>
+          <td><button>2</button></td>
+          <td><button>1</button></td>
+        </tr>
+        <tr>
+          <td><button>3</button></td>
+          <td><button>4</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <p id="legDisplay"></p>
+
+    <div style="padding-top: 50px">
+      <input type="range" id="slider_height"/>
+      <p id="label_height">Select height</p>
+    </div>
+    <div style="padding-top: 20px; writing-mode: vertical-lr;">
+      <input type="range" id="slider_pivot"/>
+      <p id="label_pivot">Select pivot</p>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+    var leg, height, pivot;
+    function ID( element ) { 
+        return document.getElementById( element ); 
+    }
+    function legSelect(n) {
+      leg = n;
+      ID("legDisplay").innerHTML = "Leg Selected: " + leg;
+    }
+    document.querySelector("body").addEventListener("click", (event) => {
+      if (event.target.tagName === "BUTTON") {
+        legSelect(event.target.innerHTML);
+      }
+    });
+    document.querySelector("body").addEventListener("input", (event) => {
+        if (target.element.id === "slider_height") {
+            height = 1.8 * target.element.value;
+            ID("label_height").innerHTML = "Height motor: " + height + "°"
+        }
+        if (target.element.id === "slider_pivot") {
+            pivot = 1.8 * angle;
+            ID("label_pivot").innerHTML = "pivot motor: " + pivot + "°"
+        }
+        fetch( `192.168.4.1/setMotor?leg=${leg}&height=${height}&pivot=${pivot}` )
+          .then( (res) => {} );
+    });
+
+    legSelect(1);
+  </script>
+</html>
