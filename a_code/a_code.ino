@@ -1,5 +1,7 @@
 #include <Wire.h>
-#define MASTER
+#include <Servo.h>
+#include "spider/spider.h"
+// #define MASTER
 
 void handler(int bytes);
 #ifdef MASTER
@@ -42,13 +44,15 @@ void loop() {
 
 #else
 void reply();
-
+Servo foot, hip;
 void setup() {
-  // put your setup code here, to run once:
+  // turn off all motors
+  // Spider::getBot().destroy();
   Serial.begin( 9600 );
-  Wire.begin(0x5);
-  Wire.setClock( 100000 );
-  Wire.onReceive( handler );
+  Wire.begin( 0x55 );
+  // hip.attach( 3, 700, 2300 ); // set to eliminate stalling
+  // foot.attach( 6, 900, 910 );
+  // Wire.onReceive( handler );
   Wire.onRequest( reply );
 }
 
@@ -65,9 +69,12 @@ void reply() {
 #endif
 
 void handler(int bytes) {
-  //while ( Wire.available() ) {
-  for (int i = 0; i < bytes; i++) {
-    Serial.print( (char) Wire.read() );
-  }  
+  spider_leg_t leg;
+  Wire.readBytes( (char *)&leg, bytes );
+  Serial.print( leg.leg );
+  Serial.print( leg.height );
+  Serial.println( leg.pivot );
+  foot.write( leg.height );
+  hip.write( leg.pivot );
 }
 

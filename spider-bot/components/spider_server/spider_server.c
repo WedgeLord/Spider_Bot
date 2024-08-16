@@ -113,13 +113,6 @@ esp_err_t setMotorHandler( httpd_req_t *req ) {
     char buffer[64] = {0};
     esp_err_t err = ESP_OK;
 
-    // assuming length is never more than 63
-    httpd_req_get_hdr_value_str( req, "Host", buffer, 64 );
-    // httpd_req_get_hdr_value_str( req, "Host", buffer, httpd_req_get_hdr_value_len( req, "Host" ) + 1 );
-
-    ESP_LOGI( TAG_AP,
-        "Host '%s' made request", buffer );
-
     memset( buffer, 0, 64 );
     ESP_ERROR_CHECK_WITHOUT_ABORT( 
         err = httpd_req_get_url_query_str( req, buffer, 64 )
@@ -151,11 +144,8 @@ esp_err_t setMotorHandler( httpd_req_t *req ) {
     user_spider_leg->leg = leg;
     user_spider_leg->height = height;
     user_spider_leg->pivot = pivot;
-    /*
-    spider_leg_t user_spider_leg = { leg, height, pivot };
-    
-    req->user_ctx( user_spider_leg );
-    */
+
+    httpd_resp_send( req, NULL, 0 );    // send 200 OK
 
     return err;
 }

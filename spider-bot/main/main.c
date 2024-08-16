@@ -7,12 +7,18 @@
 #include "spider_server.h"
 
 void spider_server_callback( spider_leg_t );
-void send_spiderbot_updates();
+void start_i2c_communication( spider_leg_t * );
 
 void app_main(void)
 {
-    static spider_leg_t spider_leg; // should this be global?
+    static spider_leg_t spider_leg = { 1, 50, 50 }; // initial value, will be overwritten by webpage
     startSpiderServer( &spider_leg );
+    TaskHandle_t i2c_task;
+    xTaskCreate( start_i2c_communication, "I2C TASK", 2000, &spider_leg, 1, &i2c_task);
+    configASSERT( i2c_task );
+}
+
+void start_i2c_communication( spider_leg_t *spider_leg ) {
     //setup 
     i2c_master_bus_config_t bus_config = {
         .i2c_port       = -1,
@@ -23,7 +29,7 @@ void app_main(void)
         .flags.enable_internal_pullup = true    // ".flags" missing from IDF docs :(
     };
 
-    i2c_master_bus_handle_t bus_handle;
+    i2c_master_bus_handle_t bus_handle; 
     ESP_ERROR_CHECK(
         i2c_new_master_bus( &bus_config, &bus_handle )
     );
@@ -34,7 +40,7 @@ void app_main(void)
         .scl_speed_hz       = 100000,
     };
 
-    static i2c_master_dev_handle_t device;
+    i2c_master_dev_handle_t device;
     ESP_ERROR_CHECK(
         i2c_master_bus_add_device( bus_handle, &dev_config, &device )
     );
@@ -43,30 +49,13 @@ void app_main(void)
         if ( ESP_OK == i2c_master_probe( bus_handle, i, 100 ) )
             printf( "device found at 0x%X\n", i);
     }
-    TaskHandle_t i2c_data_sender = NULL;
-    static void *params[2] = { &spider_leg, &device }; // arrays are static and can be found in task context
-    xTaskCreate( send_spiderbot_updates, "I2C Data Sender", 500, params, 1, &i2c_data_sender );
-    configASSERT( i2c_data_sender );
-}
-
-void send_spiderbot_updates( void *params[2] ) {
-    spider_leg_t *spider_leg = params[0];
-    i2c_master_dev_handle_t *device = params[1];
-    while ( true ) {
-        printf("leg[%d] height[%d] pivot[%d]\n", spider_leg->leg, spider_leg->height, spider_leg->pivot );
+    while (1) { // send updates to robot
         // ESP_ERROR_CHECK_WITHOUT_ABORT(
-        //     i2c_master_transmit( device, (uint8_t *) spider_leg, sizeof( spider_leg_t ), -1)
+        printf( "spider=[%d][%d][%d]\n", spider_leg->leg, spider_leg->height, spider_leg->pivot );
+            i2c_master_transmit( device, (uint8_t *) spider_leg, sizeof( spider_leg_t ), -1);
         // );
-        vTaskDelay( pdMS_TO_TICKS( 100 ) ); // wait 100ms
+        vTaskDelay( pdMS_TO_TICKS( 500 ) ); // wait 100ms
     }
-}
-
-// didn't work :(
-void spider_server_callback( spider_leg_t leg ) {
-    printf( "Callback triggered by Server\n" );
-    // ESP_ERROR_CHECK_WITHOUT_ABORT(
-    //     i2c_master_transmit( device, (uint8_t *) &leg, sizeof( spider_leg_t ), -1)
-    // );
 }
 
 #else

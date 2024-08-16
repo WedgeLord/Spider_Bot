@@ -8,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
+    <div id="buttons">
     <table>
       <tbody>
         <tr>
@@ -21,15 +22,19 @@
       </tbody>
     </table>
     <p id="legDisplay"></p>
+    </div>
 
-    <div style="padding-top: 50px">
-      <input type="range" name="slider_height"/>
-      <p id="label_height">Select height</p>
-    </div>
-    <div style="padding-top: 20px; ">
-      <input type="range" name="slider_pivot" style="writing-mode: vertical-lr;"/>
+
+    <div id="panel">
+    <div>
       <p id="label_pivot">Select pivot</p>
+      <input id="slider_pivot" type="range" name="slider_pivot"/>
     </div>
+    <div>
+      <p id="label_height">Select height</p>
+      <input id="slider_height" type="range" name="slider_height" />
+    </div>
+  </div>
   </body>
 
   <script type="text/javascript">
@@ -49,19 +54,50 @@
     });
     document.querySelector("body").addEventListener("input", (event) => {
         if (event.target.name === "slider_height") {
-            height = 1.8 * event.target.value;
-            ID("label_height").innerHTML = "Height motor: " + height + "°"
+            height = event.target.value | 0; // bitwise operations remove decimal points :)
+            ID("label_height").innerHTML = "Height motor: " + height + "%"
         }
         if (event.target.name === "slider_pivot") {
-            pivot = 1.8 * event.target.value;
-            ID("label_pivot").innerHTML = "pivot motor: " + pivot + "°"
+            pivot = event.target.value | 0;
+            ID("label_pivot").innerHTML = "pivot motor: " + pivot + "%"
         }
-        height |= 0;
-        pivot |= 0;
-        fetch( `http://192.168.4.1/setMotor?leg=${leg}&height=${height}&pivot=${pivot}` )
-          .then( (res) => {} );
+        try {
+          fetch( `http://192.168.4.1/setMotor?leg=${leg}&height=${height}&pivot=${pivot}` )
+            .then( (res) => {} );
+        } catch ( err ) {
+          alert( 'connection error', err );
+        }
     });
 
     legSelect(1);
   </script>
 </html>
+
+<style>
+  body {
+    text-align: center;
+    width: 600px;
+  }
+  #buttons {
+    display: flex;
+    flex-direction: column;
+    width: 320px;
+  }
+  button {
+    padding: 75px;
+  }
+  #panel {
+    display: flex;
+    flex-direction: row;
+  }
+  #panel > * { 
+    padding: 10px;
+  }
+  #slider_pivot {
+    width: 200px;
+  }
+  #slider_height {
+    writing-mode: vertical-lr;
+    height: 200px;
+  }
+</style>
