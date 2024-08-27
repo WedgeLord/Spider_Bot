@@ -11,7 +11,9 @@ void setup() {
   Wire.begin( 0x55 );
   Wire.onReceive( onSetMotor );
   Serial.println( "setup() complete" );
-  bot->walkSquare( "f" );
+  // bot->walkSquare( "s" );
+  // bot->walkSquare( "f" );
+  bot->walkSquare( "t" );
 }
 
 void loop() {
