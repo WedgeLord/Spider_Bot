@@ -7,6 +7,7 @@
 #include "esp_spiffs.h"
 
 #include "spider_server.h"
+// #include "../../../a_code/spider/spider.h"
 
 #define WIFI_SSID "spiderbot"
 #define WIFI_PSWD "spiderbot"
@@ -20,14 +21,14 @@ static const char *TAG_AP = "ESP32 Access Point";
 static const char *TAG_DNS = "mDNS Server";
 
 esp_err_t setMotorHandler( httpd_req_t * );
+esp_err_t setBindHandler( httpd_req_t * );
 esp_err_t catchAllHandler( httpd_req_t * );
 void prepareWebpage();
 
 char webpage[4000];
 int webpage_size = 0;
 
-void startSpiderServer( spider_leg_t *spider_leg ) {
-// void startSpiderServer( void *user_callback( spider_leg_t ) ) {
+void startSpiderServer( spider_leg_t *spider_leg, tie_callback_sig *user_callback ) {
     ESP_ERROR_CHECK(
         nvs_flash_init()
     );
@@ -88,6 +89,12 @@ void startSpiderServer( spider_leg_t *spider_leg ) {
         .handler    = setMotorHandler,
         .user_ctx   = spider_leg
     };
+    const httpd_uri_t uri_setBind =  {
+        .uri        = "/setBind",
+        .method     = HTTP_GET,
+        .handler    = setBindHandler,
+        .user_ctx   = user_callback
+    };
     const httpd_uri_t uri_catchAll = {
         .uri        = "/",
         .method     = HTTP_GET,
@@ -96,6 +103,7 @@ void startSpiderServer( spider_leg_t *spider_leg ) {
     };
     if ( httpd_start( &server, &server_config ) == ESP_OK ) {
         httpd_register_uri_handler( server, &uri_setMotor );
+        httpd_register_uri_handler( server, &uri_setBind );
         httpd_register_uri_handler( server, &uri_catchAll );
         // return server;
     }
@@ -150,13 +158,51 @@ esp_err_t setMotorHandler( httpd_req_t *req ) {
     return err;
 }
 
-esp_err_t catchAllHandler( httpd_req_t * req ) {
+esp_err_t setBindHandler( httpd_req_t *req ) {
+    int leg1, leg2, a, b;
+    char buffer[64];
+    // void (*f)() = req->user_ctx;
+    // f();
+    httpd_req_get_url_query_str( req, buffer, 64 );
+    ESP_LOGI( TAG_AP,
+        "URL query: '%s'", buffer );
+    char query_buffer[4][PARAM_SIZE] = {0};
+    esp_err_t err = ESP_OK;
+    err |= httpd_query_key_value( buffer, "leg1", query_buffer[0], PARAM_SIZE );
+    err |= httpd_query_key_value( buffer, "leg2", query_buffer[1], PARAM_SIZE );
+    err |= httpd_query_key_value( buffer, "a", query_buffer[2], PARAM_SIZE );
+    err |= httpd_query_key_value( buffer, "b", query_buffer[3], PARAM_SIZE );
+    
+    ESP_ERROR_CHECK( err );
+
+    leg1 = strtod( query_buffer[0], NULL );
+    leg2 = strtod( query_buffer[1], NULL );
+    a = strtod( query_buffer[2], NULL );
+    b = strtod( query_buffer[3], NULL );
+
+    ESP_LOGI( TAG_AP,
+        "query parameters: leg1: %d, leg2: %d, a: %d, b: %d", leg1, leg2, a, b );
+
+    // call the user_callback function
+    tie_params params = {
+        .p = {
+            leg1,
+            leg2,
+            a,
+            b
+        }
+    };
+    // ( (tie_callback_sig *) req->user_ctx )( leg1, leg2, a, b );
+    ( (tie_callback_sig *) req->user_ctx )( params );
+    httpd_resp_send( req, NULL, 0 );    // REPLACE and send pivot bounds
+    return ESP_OK;
+}
+
+esp_err_t catchAllHandler( httpd_req_t *req ) {
     char buffer[] = {0};
     esp_err_t err;
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(
-        httpd_req_get_url_query_str( req, buffer, 64 )
-    );
+    httpd_req_get_url_query_str( req, buffer, 64 );
 
     ESP_LOGI( TAG_AP,
         "request received: '%s', sending webpage...", buffer

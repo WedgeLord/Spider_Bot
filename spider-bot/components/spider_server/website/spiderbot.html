@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title></title>
-    <meta name="description" content="" />
+    <title>Spider Bot</title>
+    <meta name="description" content="Control the robot from your phone!" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
@@ -21,9 +21,9 @@
         </tr>
       </tbody>
     </table>
-    <p id="legDisplay"></p>
+    <p id="legDisplay">Select a leg!</p>
     </div>
-
+    <button id="bind">BIND</button>
 
     <div id="panel">
     <div>
@@ -32,34 +32,77 @@
     </div>
     <div>
       <p id="label_height">Select height</p>
-      <input id="slider_height" type="range" name="slider_height" />
+      <input id="slider_height" type="range" name="slider_height"/>
     </div>
   </div>
   </body>
 
   <script type="text/javascript">
-    var leg, height, pivot;
-    height = pivot = 90;
+    var leg = 1
+    var height = 50;
+    var pivot = 90;
+
+    class LegPivot {
+      constructor() {
+        this.lower = 0;
+        this.upper = 180;
+        this.pivot = 90;
+      }
+    };
+
+    const legs = [];
+    for ( var i = 1; i <= 4; i++ ) {
+      legs[i] = new LegPivot();
+    }
+
     function ID( element ) { 
         return document.getElementById( element ); 
     }
-    function legSelect(n) {
-      leg = n;
-      ID("legDisplay").innerHTML = "Leg Selected: " + leg;
-    }
-    document.querySelector("body").addEventListener("click", (event) => {
+    function legSelect( event ) {
       if (event.target.tagName === "BUTTON") {
-        legSelect(event.target.innerHTML);
+        leg = event.target.innerHTML;
+        pivot = legs[leg].pivot;
+        ID("legDisplay").innerHTML = "Leg Selected: " + leg;
+        ID( "slider_pivot" ).min = legs[leg].lower;
+        ID( "slider_pivot" ).max = legs[leg].upper;
+        ID( "slider_pivot" ).value = pivot;
+        ID("label_pivot").innerHTML = "pivot motor: " + pivot + "deg"
       }
-    });
+    }
+
+    function startBind() {
+      ID( "bind" ).removeEventListener( "click", startBind );
+      document.querySelector("#buttons table").style = "background-color: green;";
+      // values to use in the following event handler
+      var leg1 = leg;
+      var a = pivot;
+      function bind() {
+        ID( "bind" ).removeEventListener( "click", bind );
+        document.querySelector("#buttons table").style = "background: tan";
+        ID( "legDisplay" ).innerHTML = "Leg " + leg1 + " bound to leg " + leg;
+        ID( "bind" ).addEventListener( "click", startBind );
+        // send message to esp32
+        fetch( `http://192.168.4.1/setBind?leg1=${leg1}&leg2=${leg}&a=${a}&b=${pivot}` )
+          .then( (res) => {
+            // update pivot bounds
+          })
+      }
+      ID( "bind" ).addEventListener( "click", bind );
+
+    }
+
+    ID("buttons").addEventListener( "click", legSelect );
+    ID("bind").addEventListener( "click", startBind );
+
     document.querySelector("body").addEventListener("input", (event) => {
         if (event.target.name === "slider_height") {
-            height = event.target.value | 0; // bitwise operations remove decimal points :)
+            height = event.target.value;// | 0; // bitwise operations remove decimal points :)
             ID("label_height").innerHTML = "Height motor: " + height + "%"
         }
         if (event.target.name === "slider_pivot") {
-            pivot = event.target.value | 0;
-            ID("label_pivot").innerHTML = "pivot motor: " + pivot + "%"
+            pivot = event.target.value;// * 1.8 | 0;
+            legs[leg].pivot = pivot;
+            ID("label_pivot").innerHTML = "pivot motor: " + pivot + "deg"
         }
         try {
           fetch( `http://192.168.4.1/setMotor?leg=${leg}&height=${height}&pivot=${pivot}` )
@@ -68,8 +111,6 @@
           alert( 'connection error', err );
         }
     });
-
-    legSelect(1);
   </script>
 </html>
 
@@ -82,8 +123,13 @@
     display: flex;
     flex-direction: column;
     width: 320px;
+    
+    table {
+      background: tan;
+    }
   }
   button {
+    background: inherit;
     padding: 75px;
   }
   #panel {
@@ -95,6 +141,23 @@
   }
   #slider_pivot {
     width: 200px;
+  }
+  input[type=range] {
+    appearance: none;
+    background-color: red;
+
+    &::-webkit-slider-runnable-track {
+      background: green;
+      margin-left: 0%;
+      margin-right: 0%;
+    }
+    &::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border: 2px solid black;
+    }
   }
   #slider_height {
     writing-mode: vertical-lr;
