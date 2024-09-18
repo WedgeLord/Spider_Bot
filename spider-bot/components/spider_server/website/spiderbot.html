@@ -23,10 +23,10 @@
     </table>
     <p id="legDisplay">Select a leg!</p>
     </div>
-    <button id="bind">BIND</button>
+    <button id="tie">TIE</button>
 
     <div id="panel">
-    <div>
+    <div id="div_pivot">
       <p id="label_pivot">Select pivot</p>
       <input id="slider_pivot" type="range" name="slider_pivot"/>
     </div>
@@ -62,45 +62,56 @@
       if (event.target.tagName === "BUTTON") {
         leg = event.target.innerHTML;
         pivot = legs[leg].pivot;
+        lower = legs[leg].lower;
+        upper = legs[leg].upper;
         ID("legDisplay").innerHTML = "Leg Selected: " + leg;
-        ID( "slider_pivot" ).min = legs[leg].lower;
-        ID( "slider_pivot" ).max = legs[leg].upper;
-        ID( "slider_pivot" ).value = pivot;
+        var slider = ID( "slider_pivot" );
+        slider.min = lower; 
+        slider.max = upper; 
+        slider.value = pivot;
+        slider.style.paddingLeft = 100*lower/180 + "%";
+        slider.style.paddingRight = 100*(1-upper/180) + "%";
+        slider.style.width = 100*( upper - lower )/180 + "%";
         ID("label_pivot").innerHTML = "pivot motor: " + pivot + "deg"
       }
     }
 
-    function startBind() {
-      ID( "bind" ).removeEventListener( "click", startBind );
+    function startTie() {
+      ID( "tie" ).removeEventListener( "click", startTie );
       document.querySelector("#buttons table").style = "background-color: green;";
-      // values to use in the following event handler
       var leg1 = leg;
-      var a = pivot;
-      function bind() {
-        ID( "bind" ).removeEventListener( "click", bind );
+      // event callback function executed on second click of "tie" button
+      function tie() {
         document.querySelector("#buttons table").style = "background: tan";
         ID( "legDisplay" ).innerHTML = "Leg " + leg1 + " bound to leg " + leg;
-        ID( "bind" ).addEventListener( "click", startBind );
+        // undo event listener changes caused from startTie
+        ID( "tie" ).removeEventListener( "click", tie );
+        ID( "tie" ).addEventListener( "click", startTie );
         // send message to esp32
-        fetch( `http://192.168.4.1/setBind?leg1=${leg1}&leg2=${leg}&a=${a}&b=${pivot}` )
-          .then( (res) => {
+        let a = legs[leg1].pivot;
+        fetch( `http://192.168.4.1/setTie?leg1=${leg1}&leg2=${leg}&a=${a}&b=${pivot}` )
+          .then( (res) => res.json() )
+          .then( (data) => {
             // update pivot bounds
+            legs[leg1].lower = Math.max( 0, data.ret[0] );
+            legs[leg1].upper = Math.min( data.ret[1], 180 );
+            legs[leg].lower = Math.max( 0, data.ret[2] );
+            legs[leg].upper = Math.min( data.ret[3], 180 );
           })
       }
-      ID( "bind" ).addEventListener( "click", bind );
-
+      ID( "tie" ).addEventListener( "click", tie );
     }
 
     ID("buttons").addEventListener( "click", legSelect );
-    ID("bind").addEventListener( "click", startBind );
+    ID("tie").addEventListener( "click", startTie );
 
     document.querySelector("body").addEventListener("input", (event) => {
         if (event.target.name === "slider_height") {
-            height = event.target.value;// | 0; // bitwise operations remove decimal points :)
+            height = event.target.value;
             ID("label_height").innerHTML = "Height motor: " + height + "%"
         }
         if (event.target.name === "slider_pivot") {
-            pivot = event.target.value;// * 1.8 | 0;
+            pivot = event.target.value;
             legs[leg].pivot = pivot;
             ID("label_pivot").innerHTML = "pivot motor: " + pivot + "deg"
         }
@@ -140,6 +151,9 @@
     padding: 10px;
   }
   #slider_pivot {
+    width: 100%;
+  }
+  #div_pivot {
     width: 200px;
   }
   input[type=range] {

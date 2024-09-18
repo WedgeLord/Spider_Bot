@@ -1,16 +1,14 @@
 #ifndef SPIDER_SERVER
 #define SPIDER_SERVER
 
-#include "spider_types.h" // probably belongs in .c file but the spider_leg_t below would be undef
-// datatype to hold motor information
-// typedef struct {
-//     int leg;    // between 1-4 (it's a quadroped robot)
-//     int height; // the angle of the height-motor
-//     int pivot;  // the angle of the pivot-motor
-// } spider_leg_t;
+#include "spider_types.h"
 
-typedef void tie_callback_sig( tie_params );
+typedef void setMotor_callback_sig( spider_leg_t );
+typedef tie_return tie_callback_sig( tie_params );
 // sets up a password-less access point and server to host a webpage control panel
-void startSpiderServer( spider_leg_t *user_spider_leg, tie_callback_sig *user_callback );
+void startSpiderServer( 
+    setMotor_callback_sig *setMotor_callback, 
+    tie_callback_sig *tie_callback 
+);
 
 #endif

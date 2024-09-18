@@ -45,8 +45,8 @@ void start_communication( uint8_t *command ) {
     spider_server_callback( (tie_params){ { 1, 2, 0, 0 } } );
     while (1) { // send updates to robot
     /*
-        // ESP_ERROR_CHECK_WITHOUT_ABORT(
         printf( "spider=[%d][%d][%d]\n", spider_leg->leg, spider_leg->height, spider_leg->pivot );
+        // ESP_ERROR_CHECK_WITHOUT_ABORT(
             i2c_master_transmit( device, command, sizeof( spider_leg_t + 1 ), -1);
         // );
     */
@@ -104,7 +104,7 @@ void start_communication() {
     vTaskDelete( NULL );
 }
 
-void send( uint8_t command, uint8_t *send_buffer, uint8_t *rec_buffer ) {
+void send( uint8_t command, void *send_buffer, void *rec_buffer ) {
     size_t send_size, rec_size;
 
     switch ( command ) {
@@ -122,7 +122,7 @@ void send( uint8_t command, uint8_t *send_buffer, uint8_t *rec_buffer ) {
             return;
     }
     
-    // send phase uses command bits, so the _ext struct is used to change the default cmd bits
+    // send phase uses command bits, so the _ext struct is used to temporarily change the default cmd bits
     spi_transaction_ext_t send_phase = {
         .base = {
             .cmd        = command,
@@ -137,32 +137,43 @@ void send( uint8_t command, uint8_t *send_buffer, uint8_t *rec_buffer ) {
         spi_device_transmit( device, &send_phase )
     );
 
-    spi_transaction_t rec_phase = {
-        .length = rec_size * 8,
-        .rx_buffer = rec_buffer
-    };
+    if ( rec_buffer ) {
+        vTaskDelay( 40 / portTICK_PERIOD_MS );  // gives peripheral time to calculate return values
+        spi_transaction_t rec_phase = {
+            .length = rec_size * 8,
+            .rx_buffer = rec_buffer
+        };
 
-    ESP_ERROR_CHECK( 
-        spi_device_transmit( device, &rec_phase )
-    );
+        ESP_ERROR_CHECK( 
+            spi_device_transmit( device, &rec_phase )
+        );
+    }
 }
 
 #endif
 
-void spider_server_callback( tie_params );
+setMotor_callback_sig setMotor;
+tie_callback_sig tie;
+
 void app_main(void)
 {
-    static uint8_t command[sizeof(spider_leg_t) + 1];
     TaskHandle_t comm_task;
-    xTaskCreate( start_communication, "COMM TASK", 4000, command, 1, &comm_task);
+    xTaskCreate( start_communication, "COMM TASK", 4000, NULL, 1, &comm_task);
     configASSERT( comm_task );
-    spider_server_callback( (tie_params){{ 0x11, 0x22, 0x44, 0x88 }} );
-    // startSpiderServer( (spider_leg_t *) (command + 1), spider_server_callback ); 
+    // tie( (tie_params){ { 0x11, 0x22, 0x44, 0x88 } } );
+    startSpiderServer( setMotor, tie ); 
 }
-void spider_server_callback( tie_params params ) {
+
+void setMotor( spider_leg_t spider_leg ) {
+    send( 1, &spider_leg, NULL );
+    printf( "spider=[%lu][%lu][%lu]\n", spider_leg.leg, spider_leg.height, spider_leg.pivot );
+}
+
+tie_return tie( tie_params params ) {
     puts( "Callback triggered!" );
     tie_return leg_bounds = {0};
     send( 2, &params, &leg_bounds );
     printf( "bounds received: low[%d] high[%d] || low[%d] high[%d]\n", 
         leg_bounds.leg1.lower, leg_bounds.leg1.upper, leg_bounds.leg2.lower, leg_bounds.leg2.upper );
+    return leg_bounds;
 }

@@ -19,14 +19,6 @@
 
 inline int sgn( double num ) { return ((num > 0) - (num < 0)); } // gets the sign of number ( when 0 idk?? )
 
-// typedef uint8_t[4] tie_params;  // maintains agreement between modules
-
-// typedef struct {
-//   int32_t leg;
-//   int32_t height;
-//   int32_t pivot;
-// } spider_leg_t;
-
 // using "singleton" class structure
 class Spider {
 
@@ -50,17 +42,19 @@ private:
   struct Leg {
     int hip_pin;
     int foot_pin;
+    Servo hip;
+    Servo foot;    
+    constraint bounds;
+    // tie-related members
     Leg* tie;
     double length;
     bool clockwise;
-    double bound;
-    Servo hip;
-    Servo foot;
+
 
     Leg( int h, int f, int n );
     ~Leg();
-    init_leg();
-    void tieTo( Leg* tie, tie_return& constraints );
+    void init_leg();
+    constraint calcBounds();
 
   };
   static Spider* bot;
@@ -69,6 +63,7 @@ private:
   Spider();// = default;
   ~Spider() = default;
   Spider::Leg* getLeg( int index );
+  void untie( uint8_t leg );
 
 };
 
@@ -82,14 +77,14 @@ Spider::Leg Spider::leg[4]{
 };
 
 Spider::Leg::Leg( int h, int f, int n ) 
-  : hip_pin { h }, foot_pin { f }, tie { this }, hip {}, foot {} {} // empty constructor body
+  : hip_pin { h }, foot_pin { f }, tie { this }, bounds { DEFAULT_CONSTRAINT }, hip {}, foot {} {} // empty constructor body
   
 Spider::Leg::~Leg() {
   hip.detach();
   foot.detach();
 }      
 
-Spider::Leg::init_leg() {
+void Spider::Leg::init_leg() {
   hip.attach( hip_pin, 600, 2500 );
   foot.attach( foot_pin, 900, 908 );
 }
@@ -128,21 +123,21 @@ void Spider::raise( int leg, int height ) {
 }
 
 void Spider::pivot( int legNumber, int pivot ) {
-  if ( pivot < 0 || pivot > 180 ) {
-    // Serial.println( "pivot angle out of bounds" );
+  Leg* leg = this->getLeg( legNumber );
+  if ( pivot < leg->bounds.lower || pivot > leg->bounds.upper ) {
+    Serial.println( "out of bounds!" );
     return;
   }
-  Leg* leg = this->getLeg( legNumber );
+  // check for tie
   Leg* tie = leg->tie;
-  if ( tie == leg ) {
+  if ( tie == leg ) { // if not tied
     leg->hip.write( pivot );
     return;
   }    
   // if tied
   // Serial.print( "clockwise = " );
   // Serial.println( leg->clockwise ? "true" : "false" );    
-  int c;
-  double length, ang;
+  double c, length, ang;
   length = leg->length;
   if ( leg->clockwise ) {
     c = 1;
@@ -152,38 +147,12 @@ void Spider::pivot( int legNumber, int pivot ) {
     c = -1;
     ang = pivot - 135;
   }
-  double bound = leg->bound;
+
   // Serial.print( "Angle: " );
   // Serial.println( ang );   
   // Serial.print( "pivot: " );
   // Serial.println( pivot );  
-  // Serial.print( "Bound: " );
-  // Serial.println( bound );      
            
-  bool wideSpread = length > BODY_WIDTH;
-  bool outBounds = false;
-  if ( leg->clockwise ) {
-    if ( wideSpread ) {
-      if ( pivot < bound ) 
-        outBounds = true;
-    }
-    else 
-      if ( pivot > bound )
-        outBounds = true;
-  }
-  else {
-    if ( wideSpread ) {
-      if ( pivot > bound ) 
-        outBounds = true;
-    }
-    else
-      if ( pivot < bound )
-        outBounds = true;
-  }
-  if ( outBounds ) {
-    // Serial.println( "out of bounds!" );
-    return;
-  }
   ang *= PI / 180;  // convert to radians
   double b_pivot = -1*c*sgn(cos(ang)) * acos(
       sgn(cos(ang)) * ( pow( BODY_WIDTH, 2 ) - pow( length, 2 ) + 2*pow( LEG_RADIUS, 2 ) + c*2*BODY_WIDTH*LEG_RADIUS*sin(ang) ) 
@@ -197,8 +166,8 @@ void Spider::pivot( int legNumber, int pivot ) {
   else {
     b_pivot += 45;
   }
-  // Serial.print( "b_pivot = " );
-  // Serial.println( b_pivot );    
+  Serial.print( "b_pivot = " );
+  Serial.println( b_pivot );    
 
   if ( b_pivot < 0 ) {
     // Serial.println( "Out of bounds!!!" );
@@ -224,77 +193,99 @@ void Spider::destroy() {
     l.~Leg();
   }
 }
-void Spider::Leg::tieTo( Spider::Leg* tie, tie_return& constraints ) {
-  // Serial.println( "begin tieTo" );
+constraint Spider::Leg::calcBounds() {
+  constraint leg_bounds = DEFAULT_CONSTRAINT;
+  if ( this == this->tie ) {
+    return leg_bounds;
+  }
 
-  // helper function to calculate and update a leg's pivot range
-  auto calcBound = []( Leg* l, constraint& leg_bounds ) {
-    int s = (l->length > BODY_WIDTH) - (l->length < BODY_WIDTH);  // what if ==??
-    int c = ( l->clockwise ) ? 1 : -1;
-    double bound = asin( c*( pow( l->length, 2 ) - pow( BODY_WIDTH, 2 ) - s*2*LEG_RADIUS*l->length ) 
-      / ( 2*LEG_RADIUS*BODY_WIDTH )
-      );
-    bound *= 180 / PI;
-    l->bound = bound;
-    if ( c == s ) {
-      leg_bounds.lower = bound;
-      leg_bounds.upper = 180;
-    }
-    else {
-      leg_bounds.lower = 0;
-      leg_bounds.upper = bound;
-    }
-  };
+  double s = (this->length > BODY_WIDTH) - (this->length < BODY_WIDTH);  
+  double c = ( this->clockwise ) ? 1 : -1;
+  double bound = asin( c*( pow( this->length, 2 ) - pow( BODY_WIDTH, 2 ) - s*2*LEG_RADIUS*this->length ) 
+    / ( 2*LEG_RADIUS*BODY_WIDTH )
+    );
+  bound *= 180 / PI;
+  if ( this->clockwise ) {
+    bound += 45;
+  }
+  else {
+    bound += 135;
+  }
 
-  calcBound( this, constraints.leg1 );
-  calcBound( tie, constraints.leg2 );
-
+  if ( c == s ) {
+    leg_bounds.lower = bound;
+  }
+  else {
+    leg_bounds.upper = bound;
+  }
+  // Serial.print( "lower: " ); Serial.println( leg_bounds.lower );
+  // Serial.print( "upper: " ); Serial.println( leg_bounds.upper );
+  return leg_bounds;
+}
+void Spider::untie( uint8_t leg ) {
+  Leg *a = this->getLeg( leg );
+  Leg *b = a->tie;
+  if ( a != b ) { // if leg1 is tied
+    // reset ties
+    a->tie = a;
+    b->tie = b;
+    a->bounds = DEFAULT_CONSTRAINT;
+    b->bounds = DEFAULT_CONSTRAINT;
+  }
 }
 
-// bool Spider::tie( int leg1, int leg2, int pivot1, int pivot2 ) {
 tie_return Spider::tie( tie_params params ) {
-  tie_return leg_bounds = {0};
   uint8_t leg1 = params.p[0];
   uint8_t leg2 = params.p[1];
   uint8_t pivot1 = params.p[2];
   uint8_t pivot2 = params.p[3];
 
+  tie_return leg_bounds = { DEFAULT_CONSTRAINT, DEFAULT_CONSTRAINT };
+
   // Serial.println( "begin tie" );
   // check adjacency
-  if ( ( ( leg1 ^ leg2 ) ^ 1 ) & 1 ) {
-    // Serial.println( "legs not adjacent!" );
+  if ( ( leg1 - leg2 ) % 4 == 2 ) {
+    Serial.println( "legs not adjacent!" );
     return leg_bounds;
+  }  
+
+  // begin untie leg1
+  this->untie( leg1 );
+
+  if ( leg1 != leg2 ) {  // legs are adjacent
+    this->untie( leg2 );
+
+    Leg *a = this->getLeg( leg1 );
+    Leg *b = this->getLeg( leg2 );
+    b->tie->tie = b->tie;
+    double angle1 = ( pivot1 - 45 ) * PI/180;
+    double angle2 = ( pivot2 - 135 ) * PI/180;
+
+    double x1 = cos( angle1 ) * LEG_RADIUS;
+    double x2 = cos( angle2 ) * LEG_RADIUS;
+
+    double y1 = sin( angle1 ) * LEG_RADIUS;  
+    double y2 = sin( angle2 ) * LEG_RADIUS;
+
+    bool clockwise = ( ( leg1 - 1 ) % 4 == leg2 ); // leg numbers increase in counter-clockwise manner                                
+
+    double length = sqrt( pow(  x1 - x2, 2 ) + pow( y1 - y2 + BODY_WIDTH, 2 ) );
+
+    // Serial.print( "Tie length = " );
+    // Serial.println( length );   
+
+    // store tie data
+    a->length = length;
+    b->length = length; 
+    a->clockwise = clockwise;
+    b->clockwise = !clockwise;
+    a->tie = b;
+    b->tie = a;
+    a->bounds = a->calcBounds(); 
+    b->bounds = b->calcBounds();  
+    leg_bounds = { a->bounds, b->bounds };
+    this->pivot( leg1, pivot1 );  // send pivot command  
   }
-  double angle1 = ( pivot1 - 45 ) * PI / 180;
-  double angle2 = ( pivot2 - 135 ) * PI / 180;
-
-  double x1 = cos( angle1 ) * LEG_RADIUS;
-  double x2 = cos( angle2 ) * LEG_RADIUS;
-
-  double y1 = sin( angle1 ) * LEG_RADIUS;  
-  double y2 = sin( angle2 ) * LEG_RADIUS;
-
-  bool clockwise = ( ( leg1 ^ leg2 )>>1  ^ leg1 ) & 1;
-  if ( clockwise ) {
-    y1 += BODY_WIDTH;
-  }
-  else {
-    y2 += BODY_WIDTH;
-  }
-  double length = sqrt( pow( x2 - x1, 2 ) + pow( y2 - y1, 2 ) );
-  Leg *a = this->getLeg( leg1 );
-  Leg *b = this->getLeg( leg2 );
-  // Serial.print( "Tie length = " );
-  // Serial.println( length );   
-  a->length = length;
-  b->length = length; 
-  a->clockwise = clockwise;
-  b->clockwise = !clockwise;
-  a->tie = leg2;
-  b->tie = leg1;
-  a->tieTo( b, leg_bounds );
-
-  this->pivot( leg1, pivot1 );  // send pivot command
   return leg_bounds;
 }
 
@@ -310,18 +301,7 @@ void Spider::walkSquare( char *direction ) {
       }
       else Serial.println("fail");
       break;
-    case 's':
-      this->setMotor( 1, 0, 0 );
-      this->setMotor( 2, 0, 0 );
-      this->setMotor( 3, 0, 0 );
-      this->setMotor( 4, 0, 0 );
-      delay( 5000 );
-      this->pivot( 1, 100 );
-      this->pivot( 2, 100 );
-      this->pivot( 3, 100 );
-      this->pivot( 4, 100 );
-      delay( 5000 );
-      break;
+
     default:
       Serial.println( "direction options are: f, b, l, r" );
   }

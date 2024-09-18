@@ -1,14 +1,16 @@
 #ifndef SPIDER_TYPES
 #define SPIDER_TYPES
 
+#define DEFAULT_CONSTRAINT ( (constraint){ 0, 180 } )
 #define max( a, b ) ( (a > b) ? a : b )
+#define MAX_SPI_TRANSMIT max( max( sizeof( tie_params ), sizeof( tie_return ) ), sizeof( spider_leg_t ) )
 
 #ifdef __CPLUSPLUS
 extern "C" {
 #endif
 
-  // this is meh because the array address is passed around and could be changed mid-execution (EXTREMELY UNLIKELY)
-  typedef struct { uint8_t p[4]; } tie_params; // maintains agreement between modules
+  // this is meh because the array address is passed around and data could be changed mid-execution (EXTREMELY UNLIKELY)
+  typedef struct { uint8_t p[4]; } tie_params; 
   
   typedef struct { 
     uint8_t lower;
@@ -26,11 +28,6 @@ extern "C" {
       uint32_t pivot;
   } spider_leg_t;
 
-  const size_t MAX_TRANSMISSION = 
-    max( max( 
-      sizeof( tie_params ), 
-      sizeof( tie_return ) ), 
-      sizeof( spider_leg_t ) );
 
 #ifdef __CPLUSPLUS
 }

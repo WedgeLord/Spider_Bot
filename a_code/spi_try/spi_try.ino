@@ -7,8 +7,8 @@ volatile uint8_t command = 0;
 
 char msg[] = "sup";
 int index = 0;
-uint8_t input[MAX_TRANSMISSION] = {0};
-uint8_t output[MAX_TRANSMISSION] = {0};
+uint8_t input[MAX_SPI_TRANSMIT] = {0};
+uint8_t output[MAX_SPI_TRANSMIT] = {0};
 uint8_t *in_ptr = input;  // pointer to parameter struct
 uint8_t *out_ptr = output; // pointer to bounds struct
 
