@@ -76,18 +76,6 @@ void resetSPI() {
   digitalWrite( A1, LOW );
 }
 
-void setup() {
-  Serial.begin( 9600 );
-  bot = Spider::getBot();
-  SPCR = _BV(SPIE) | _BV(SPE);
-  *((tie_return *) output) = { { 8, 12 }, { 64, 128 } };  // test data
-  pinMode( MISO, OUTPUT );
-  pinMode( A1, OUTPUT );
-  SPDR = 0x55;
-  digitalWrite( A1, LOW );
-  Serial.println( "SETUP COMPLETE" );
-}
-
 void loop() {
   if ( received ) {
     received = false;
@@ -111,3 +99,17 @@ void loop() {
     Serial.println( "COLLISION" );
   }
 }
+
+void setup() {
+  Serial.begin( 9600 );
+  bot = Spider::getBot();
+  SPCR = _BV(SPIE) | _BV(SPE);
+  *((tie_return *) output) = { { 8, 12 }, { 64, 128 } };  // test data
+  pinMode( MISO, OUTPUT );
+  pinMode( A1, OUTPUT );
+  SPDR = 0x55;
+  digitalWrite( A1, LOW );
+  Serial.println( "SETUP COMPLETE" );
+  bot->walkSquare( "f" );
+}
+
